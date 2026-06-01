@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QQQ 1DTE Put Spread 回测</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #080b0f;
+    --bg1:      #0e1218;
+    --bg2:      #141920;
+    --border:   #1e2530;
+    --text:     #c8d4e0;
+    --muted:    #4a5568;
+    --green:    #3dffa0;
+    --orange:   #ff9f43;
+    --red:      #ff5e5e;
+    --blue:     #5eaaff;
+    --purple:   #b97fff;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    padding: 36px 28px;
+  }
+
+  /* Header */
+  .header { margin-bottom: 32px; }
+  .header-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 5px;
+    color: var(--green);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: -0.5px;
+  }
+  .header-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* Card */
+  .card {
+    background: var(--bg1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+    margin-bottom: 14px;
+  }
+  .card-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  /* Slider */
+  .slider-row { display: flex; align-items: center; gap: 18px; }
+  .slider-wrap { flex: 1; position: relative; }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 10px rgba(61,255,160,0.4);
+    cursor: pointer;
+    transition: box-shadow .2s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 18px rgba(61,255,160,0.7);
+  }
+  .slider-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 30px;
+    font-weight: 600;
+    color: var(--green);
+    min-width: 72px;
+    text-align: right;
+    text-shadow: 0 0 20px rgba(61,255,160,0.3);
+  }
+  .slider-desc {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: #252d38;
+    margin-top: 10px;
+  }
+
+  /* KPI Grid */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .kpi {
+    background: var(--bg1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent, var(--border));
+    opacity: 0.6;
+  }
+  .kpi-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+  .kpi-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent, #fff);
+  }
+
+  /* Year Grid */
+  .year-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 8px;
+  }
+  .year-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 8px;
+    text-align: center;
+  }
+  .year-label { font-size: 10px; color: var(--muted); margin-bottom: 5px; font-family: 'IBM Plex Mono', monospace; }
+  .year-rate { font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 600; }
+  .year-count { font-size: 9px; color: #2a3040; margin-top: 3px; font-family: 'IBM Plex Mono', monospace; }
+  .year-bar-bg { margin-top: 7px; height: 2px; background: var(--border); border-radius: 1px; }
+  .year-bar-fill { height: 100%; border-radius: 1px; transition: width .4s ease; }
+
+  /* Month bars */
+  .month-chart {
+    display: flex;
+    gap: 5px;
+    align-items: flex-end;
+    height: 88px;
+  }
+  .month-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .month-pct { font-family: 'IBM Plex Mono', monospace; font-size: 8px; color: var(--muted); }
+  .month-bar { width: 100%; border-radius: 2px 2px 0 0; transition: height .4s ease; min-height: 2px; }
+  .month-name { font-family: 'IBM Plex Mono', monospace; font-size: 8px; color: #2a3040; }
+
+  /* Table */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .tbl th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    font-weight: 400;
+    color: var(--muted);
+    padding: 5px 8px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .tbl th:first-child { text-align: left; }
+  .tbl td {
+    padding: 7px 8px;
+    text-align: right;
+    border-bottom: 1px solid #0c0f14;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+  }
+  .tbl td:first-child { text-align: left; color: var(--muted); }
+  .tbl tr:hover td { background: #0f1318; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .badge-full { background: #3a0f0f; color: var(--red); }
+  .badge-part { background: #231508; color: var(--orange); }
+
+  /* Status */
+  .status-box {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+  .status-box.error { color: var(--red); }
+  .spin {
+    display: inline-block;
+    animation: spin 1.2s linear infinite;
+    font-size: 24px;
+    margin-bottom: 14px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .footer {
+    margin-top: 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: #181e28;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-label">Backtest · QQQ · 2020 – Today</div>
+  <h1>1DTE Put Spread 回测</h1>
+  <div class="header-sub" id="sub-desc">正在加载数据...</div>
+</div>
+
+<!-- Slider -->
+<div class="card">
+  <div class="card-label">Short Put 距离开盘价</div>
+  <div class="slider-row">
+    <div class="slider-wrap">
+      <input type="range" id="offset" min="5" max="60" step="1" value="20">
+    </div>
+    <div class="slider-val" id="offset-val">−$20</div>
+  </div>
+  <div class="slider-desc" id="slider-desc">Short Put = 开盘 − $20 · Long Put = 开盘 − $25 · 价宽 $5</div>
+</div>
+
+<div id="main-content">
+  <div class="status-box">
+    <div class="spin">◌</div><br>
+    正在从 Yahoo Finance 获取 QQQ 历史数据...
+  </div>
+</div>
+
+<div class="footer">以次日最低价判断触及 · 数据来源 Yahoo Finance · 非投资建议</div>
+
+<script>
+const MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+let rawData = null;
+
+async function fetchData() {
+  const from = Math.floor(new Date('2020-01-01').getTime() / 1000);
+  const to   = Math.floor(Date.now() / 1000);
+  // Try multiple endpoints
+  const urls = [
+    `https://query1.finance.yahoo.com/v8/finance/chart/QQQ?interval=1d&period1=${from}&period2=${to}`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/QQQ?interval=1d&period1=${from}&period2=${to}`,
+  ];
+  const proxies = [
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    u => u,
+  ];
+
+  for (const mkProxy of proxies) {
+    for (const base of urls) {
+      try {
+        const url = mkProxy(base);
+        const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+        if (!res.ok) continue;
+        const json = await res.json();
+        const r = json.chart.result[0];
+        const q = r.indicators.quote[0];
+        const days = r.timestamp.map((t, i) => ({
+          date:  new Date(t * 1000).toISOString().slice(0, 10),
+          open:  q.open[i],
+          low:   q.low[i],
+          close: q.close[i],
+        })).filter(d => d.open != null && d.low != null && d.close != null);
+        if (days.length > 100) return days;
+      } catch(e) { /* try next */ }
+    }
+  }
+  throw new Error('所有数据源均无法访问');
+}
+
+function runBacktest(data, offset) {
+  let total = 0, hit = 0, fullLoss = 0;
+  const byYear  = {};
+  const byMonth = Array(12).fill(null).map(() => ({ total: 0, hit: 0 }));
+  const byDow   = Array(7).fill(null).map(() => ({ total: 0, hit: 0 })); // 0=Sun
+  const hitDays = [];
+  let streak = 0, maxStreak = 0;
+  const moves = [];
+
+  for (let i = 0; i < data.length - 1; i++) {
+    const today = data[i];
+    const next  = data[i + 1];
+    const shortPut = today.open - offset;
+    const longPut  = shortPut - 5;
+    const yr = today.date.slice(0, 4);
+    const mo = parseInt(today.date.slice(5, 7)) - 1;
+    const dow = new Date(today.date + 'T12:00:00Z').getUTCDay();
+
+    if (!byYear[yr]) byYear[yr] = { total: 0, hit: 0, fullLoss: 0 };
+    total++;
+    byYear[yr].total++;
+    byMonth[mo].total++;
+    byDow[dow].total++;
+
+    const pct = ((next.close - today.open) / today.open) * 100;
+    moves.push(pct);
+
+    if (next.low <= shortPut) {
+      hit++;
+      byYear[yr].hit++;
+      byMonth[mo].hit++;
+      byDow[dow].hit++;
+      streak++;
+      maxStreak = Math.max(maxStreak, streak);
+      const fl = next.low <= longPut;
+      if (fl) { fullLoss++; byYear[yr].fullLoss++; }
+      hitDays.push({ entryDate: today.date, open: today.open, shortPut, longPut, low: next.low, close: next.close, pct, fullLoss: fl, dow });
+    } else {
+      streak = 0;
+    }
+  }
+
+  moves.sort((a, b) => a - b);
+  return {
+    total, hit, fullLoss,
+    winRate:      (((total - hit) / total) * 100).toFixed(1),
+    hitRate:      ((hit / total) * 100).toFixed(1),
+    fullLossRate: ((fullLoss / total) * 100).toFixed(1),
+    byYear, byMonth, byDow, maxStreak,
+    p5: moves[Math.floor(moves.length * 0.05)]?.toFixed(2),
+    p1: moves[Math.floor(moves.length * 0.01)]?.toFixed(2),
+    hitDays: [...hitDays].reverse().slice(0, 25),
+    dateRange: `${data[0].date} — ${data[data.length-1].date}`,
+  };
+}
+
+function colorForRate(r) {
+  if (r > 20) return 'var(--red)';
+  if (r > 12) return 'var(--orange)';
+  return 'var(--green)';
+}
+
+function render(results, offset) {
+  const f2 = n => typeof n === 'number' ? n.toFixed(2) : n;
+  const DOW_NAMES = ['日','一','二','三','四','五','六'];
+
+  let html = '';
+
+  // KPI
+  html += `<div class="kpi-grid">`;
+  const kpis = [
+    { label: '策略胜率',      val: results.winRate + '%',      color: 'var(--green)'  },
+    { label: 'Short Put触及', val: results.hitRate + '%',      color: 'var(--orange)' },
+    { label: '最大亏损触及',  val: results.fullLossRate + '%', color: 'var(--red)'    },
+    { label: '总交易天数',    val: results.total + '天',       color: 'var(--blue)'   },
+    { label: '最大连续亏损',  val: results.maxStreak + '天',   color: 'var(--purple)' },
+    { label: '最差1%日跌幅',  val: results.p1 + '%',           color: 'var(--red)'    },
+  ];
+  kpis.forEach(k => {
+    html += `<div class="kpi" style="--accent:${k.color}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-val" style="color:${k.color}">${k.val}</div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // By Year
+  html += `<div class="card"><div class="card-label">逐年触及率</div><div class="year-grid">`;
+  Object.entries(results.byYear).sort().forEach(([yr, d]) => {
+    const r = d.total > 0 ? d.hit / d.total * 100 : 0;
+    const col = colorForRate(r);
+    html += `<div class="year-card">
+      <div class="year-label">${yr}</div>
+      <div class="year-rate" style="color:${col}">${r.toFixed(1)}%</div>
+      <div class="year-count">${d.hit}/${d.total}天</div>
+      <div class="year-bar-bg"><div class="year-bar-fill" style="width:${Math.min(r*4,100)}%;background:${col}"></div></div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // By Month
+  html += `<div class="card"><div class="card-label">各月触及率</div><div class="month-chart">`;
+  const maxMR = Math.max(...results.byMonth.map(m => m.total > 0 ? m.hit/m.total : 0), 0.01);
+  results.byMonth.forEach((m, i) => {
+    const r = m.total > 0 ? m.hit / m.total : 0;
+    const h = Math.max((r / maxMR) * 68, 2);
+    const col = colorForRate(r * 100);
+    html += `<div class="month-col">
+      <div class="month-pct">${(r*100).toFixed(0)}%</div>
+      <div class="month-bar" style="height:${h}px;background:${col};opacity:.85"></div>
+      <div class="month-name">${MONTHS[i][0]}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // By Day of Week
+  html += `<div class="card"><div class="card-label">星期几触及率</div><div class="month-chart">`;
+  const dowOrder = [1,2,3,4,5]; // Mon-Fri
+  const maxDR = Math.max(...dowOrder.map(d => results.byDow[d].total > 0 ? results.byDow[d].hit/results.byDow[d].total : 0), 0.01);
+  dowOrder.forEach(d => {
+    const m = results.byDow[d];
+    const r = m.total > 0 ? m.hit / m.total : 0;
+    const h = Math.max((r / maxDR) * 68, 2);
+    const col = colorForRate(r * 100);
+    html += `<div class="month-col">
+      <div class="month-pct">${(r*100).toFixed(1)}%</div>
+      <div class="month-bar" style="height:${h}px;background:${col};opacity:.85"></div>
+      <div class="month-name">周${DOW_NAMES[d]}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // Hit Table
+  html += `<div class="card"><div class="card-label">最近被触及记录（最近25次）</div>
+  <div style="overflow-x:auto">
+  <table class="tbl">
+    <thead><tr>
+      <th>进场日</th><th>星期</th><th>开盘</th><th>Short Put</th><th>次日低</th><th>次日收</th><th>跌幅</th><th>结果</th>
+    </tr></thead>
+    <tbody>`;
+  const DNAMES = ['日','一','二','三','四','五','六'];
+  results.hitDays.forEach(d => {
+    const pctCol = d.pct < -4 ? 'var(--red)' : d.pct < -2.5 ? 'var(--orange)' : 'var(--text)';
+    html += `<tr>
+      <td>${d.entryDate}</td>
+      <td style="color:var(--muted)">周${DNAMES[d.dow]}</td>
+      <td style="color:var(--muted)">$${f2(d.open)}</td>
+      <td style="color:var(--orange)">$${f2(d.shortPut)}</td>
+      <td style="color:var(--red)">$${f2(d.low)}</td>
+      <td style="color:var(--muted)">$${f2(d.close)}</td>
+      <td style="color:${pctCol}">${d.pct.toFixed(2)}%</td>
+      <td><span class="badge ${d.fullLoss ? 'badge-full' : 'badge-part'}">${d.fullLoss ? '全损' : '部分'}</span></td>
+    </tr>`;
+  });
+  html += `</tbody></table></div></div>`;
+
+  document.getElementById('main-content').innerHTML = html;
+}
+
+// Init
+(async () => {
+  try {
+    rawData = await fetchData();
+    const offset = parseInt(document.getElementById('offset').value);
+    document.getElementById('sub-desc').textContent =
+      `${rawData[0].date} — ${rawData[rawData.length-1].date} · ${rawData.length} 个交易日 · 数据来源 Yahoo Finance`;
+    render(runBacktest(rawData, offset), offset);
+  } catch(e) {
+    document.getElementById('main-content').innerHTML =
+      `<div class="status-box error">⚠ 数据加载失败：${e.message}<br><br>
+      <span style="font-size:11px;color:#4a5568">请确认网络连接正常后刷新页面重试</span></div>`;
+  }
+})();
+
+// Slider
+document.getElementById('offset').addEventListener('input', function() {
+  const v = parseInt(this.value);
+  document.getElementById('offset-val').textContent = `−$${v}`;
+  document.getElementById('slider-desc').textContent =
+    `Short Put = 开盘 − $${v} · Long Put = 开盘 − $${v+5} · 价宽 $5`;
+  if (rawData) render(runBacktest(rawData, v), v);
+});
+</script>
+</body>
+</html>
